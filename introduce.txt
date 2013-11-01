@@ -1,0 +1,110 @@
+百度用户登陆流程详细分析、百度账号批量登陆程序
+发布日期：2012-08-21 10:57:35浏览次数：1691文章作者：Nuclear'Atk网友评论：7 评论最后修改：2012-08-24 13:47:52
+前些天，因某些业务需要，需开发一个与百度相关的程序，其中一个子功能便是：百度账号批量登陆、并保持在线状态。
+
+花了些时间研究了一番，当时写了点分析文档，现发出来，也许其他人可能会有需要吧……
+
+登陆页面：
+
+这个有很多个地址，各种百度页面都有，例如：百度首页、贴吧、知道、博客、文库等，但无一例外都是调用的：passport.baidu.com
+
+本文分析时，采用的地址为：http://www.baidu.com/cache/user/html/login-1.2.html
+
+地址对登陆流程无影响，提交的数据包格式都是完全一样的。
+
+登录流程：
+
+注意：以下操作必须使用百度的 cookie（可以通过访问百度域名旗下任何页面获得，例如百度首页），否则无法登陆及获取 token，例如：BAIDUID=0915774773D18CA1A50FB5012E9F9E5A:FG=1，关键值为：BAIDUID，是用户识别码（提示：百度可以通过这个追踪你在所有百度子域名的访问记录，百度推广平台更是依靠这个进行针对性广告推送，这里就不多讲了）。
+
+0x01.检查是否需要验证码
+
+在加载完登陆页面后，开始填写用户名（例子：test@baidu.com），当填完用户名后，切换输入框的时候，页面会提交一个GET请求：
+
+检查是否需要验证码：数据包 {
+    //https://passport.baidu.com/v2/api/?logincheck&callback=bdPass.api.login._needCodestringCheckCallback&tpl=mn&charset=utf-8&index=0&username=test@baidu.com&time=1345429566039
+    /*
+    https://passport.baidu.com/v2/api/?logincheck
+    callback=bdPass.api.login._needCodestringCheckCallback
+    tpl=mn
+    charset=utf-8
+    index=0
+    username=test@baidu.com
+    time=1345429566039
+    */
+}
+数据包格式很简单，提交用户名到百度系统，判断该用户是否需要使用验证码，主要是通过判断登陆地点（异地登陆）等信息决定是否启用验证码，然后会分别返回一些 js 数据：
+
+//无需验证码
+bdPass.api.login._needCodestringCheckCallback({"errno":0,"codestring":"","index":"0"})
+
+//需要验证码
+bdPass.api.login._needCodestringCheckCallback({"errno":0,"codestring":"00134551910401544CDC299B469B5E46D32022AFD068465D3EA7BF0FCFBF84159218814618D466E1E06B531057E7F6249BD724257D2778654C70D4D943DD10CBB421A1E241A81A738E08AFBBAAA53D29894495B6C0079092D24BCFFF0F76DBE8E3F580551DABF998EA0F30387CD05E7109A82FBF82F363D3CD8702E84BC468B09BF44EEF99E61E235B30637E8A04CFAF5C4EB25458C63B878788DC85340637AC1AA9D25538A7A899","index":"0"})
+
+//根据 codestring 生成验证码
+https://passport.baidu.com/cgi-bin/genimage?00134551910401544CDC299B469B5E46D32022AFD068465D3EA7BF0FCFBF84159218814618D466E1E06B531057E7F6249BD724257D2778654C70D4D943DD10CBB421A1E241A81A738E08AFBBAAA53D29894495B6C0079092D24BCFFF0F76DBE8E3F580551DABF998EA0F30387CD05E7109A82FBF82F363D3CD8702E84BC468B09BF44EEF99E61E235B30637E8A04CFAF5C4EB25458C63B878788DC85340637AC1AA9D25538A7A899&v=1345519099647
+由于我这里没有用到验证码（批量登陆的时候，可以绕过验证码的），所以没有详细跟进分析，感兴趣的同学可以分析一下返回数据包，这些数据包很简单的……
+
+0x02.发送登录数据包
+
+填写完账号、密码（及验证码）后，点击登录，则开始提交登录数据包：
+
+发送登录数据包 {
+    POST {
+        /*
+        https://passport.baidu.com/v2/api/?login
+        */
+    }
+    Data {
+        /*
+        <script src="https://passport.baidu.com/js/pass_api_login.js?v=20120731" type="text/javascript" charset="UTF-8"></script>
+        行：m(L,[{
+        */
+        !ppui_logintime=9379&charset=utf-8&codestring=&token=e26c8539626cdfac6e4fcd4d5c8e0e83&isPhone=false&index=0&u=&safeflg=0&staticpage=http%3A%2F%2Fwww.baidu.com%2Fcache%2Fuser%2Fhtml%2Fjump.html&loginType=1&tpl=mn&callback=parent.bdPass.api.login._postCallback&username=test@baidu.com&password=123456&verifycode=&mem_pass=on
+        /*
+        ppui_logintime=9379 [用户在页面停留的毫秒数]
+        charset=utf-8
+        codestring=
+        token=e26c8539626cdfac6e4fcd4d5c8e0e83 [token 获取方式见下]
+        isPhone=false [是否手机号登陆模式]
+        index=0
+        u=
+        safeflg=0
+        staticpage=http%3A%2F%2Fwww.baidu.com%2Fcache%2Fuser%2Fhtml%2Fjump.html
+        loginType=1
+        tpl=mn
+        callback=parent.bdPass.api.login._postCallback
+        username=test@baidu.com [账号]
+        password=123456 [密码]
+        verifycode=
+        mem_pass=on [是否记住登录状态]
+        */
+    }
+}
+token 获取方式 {
+    /*
+    使用百度 cookie（BAIDUID）访问如下地址，然后提取字符串（该值为固定值并唯一，和 BAIDUID 的值对应）。
+    地址：<script src="https://passport.baidu.com/v2/api/?getapi&class=login&tpl=mn&tangram=true" type="text/javascript"></script>
+    行 5：bdPass.api.params.login_token='e26c8539626cdfac6e4fcd4d5c8e0e83';
+    */
+}
+数据包中注释写得很详细，可以看看。
+
+提交之后，如果账号、密码正确，百度系统会返回一个或多个 Set-Cookie 值（如下所示），及一段跳转代码，跳转到登陆之前的页面，否则会返回错误代码：error=***
+
+Set-Cookie:
+
+BDUSS=pRT29kMERuS28tdXB4YzZ5OC02cDE4R04za********************************************************************************************************************HIAAAAAmWdCAAAAAAAxMC40Mi4yMjMAM1AzADNQSV; expires=Sat, 07-Nov-2020 03:27:47 GMT; path=/; domain=baidu.com
+
+PTOKEN=1b97128dc7************9039b65b21; expires=Sat, 07-Nov-2020 03:27:47 GMT; path=/; domain=passport.baidu.com
+
+STOKEN=03b2d2205d************5ad6301745; expires=Sat, 07-Nov-2020 03:27:47 GMT; path=/; domain=passport.baidu.com
+
+PTOKEN=deleted; expires=Mon, 22-Aug-2011 03:27:46 GMT; path=/; domain=baidu.com
+
+SAVEUSERID=217cb64e2dff1587bc**********f38f557957452436; expires=Sat, 07-Nov-2020 03:27:47 GMT; path=/; domain=passport.baidu.com
+其中有用的关键 cookie 值只有一个：
+
+BDUSS=pRT29kMERuS28tdXB4YzZ5OC02cDE4R04za********************************************************************************************************************HIAAAAAmWdCAAAAAAAxMC40Mi4yMjMAM1AzADNQSV
+然后提取该值，并与之前的 BAIDUID 拼接成为一个完整的 Cookie：
+
+BAIDUID=0915774773D18CA1A50FB5012E9F9E5A:FG=1; BDUSS=pRT29kMERuS28tdXB4YzZ5OC02cDE4R04za********************************************************************************************************************HIAAAAAmWdCAAAAAAAxMC40Mi4yMjMAM1AzADNQSV

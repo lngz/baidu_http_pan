@@ -1,0 +1,5 @@
+password.py
+.DS_Store
+*.pyc
+*.log
+cookie*
