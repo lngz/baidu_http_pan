@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
 import cookielib, urllib2
@@ -11,7 +11,7 @@ reload(sys)
 sys.setdefaultencoding('UTF-8')
 
 import os,sys,socket,re
-
+#!/usr/bin/env python
 import io
 #获取登陆token
 import codecs
