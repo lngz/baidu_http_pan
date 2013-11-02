@@ -7,6 +7,7 @@ import json
 import hashlib
 import re
 import sys
+import time
 reload(sys)
 sys.setdefaultencoding('UTF-8')
 
@@ -118,7 +119,7 @@ class Baidu(object):
         self.opener.addheaders = [('User-agent','Opera/9.23')]
         urllib2.install_opener(self.opener)
 
-        socket.setdefaulttimeout(30)
+        #socket.setdefaulttimeout(60)
 
     #登陆百度
     def login(self):
@@ -211,6 +212,8 @@ class Baidu(object):
         if BDUSS == None :
             logger.info("login failed")
             sys.exit(1)
+        starttime = time.time()
+        logger.debug(starttime)
         upload_file_url = 'http://c.pcs.baidu.com/rest/2.0/pcs/file?'
         upload_file_url += urllib.urlencode({
                     'BDUSS':BDUSS,
@@ -275,6 +278,13 @@ class Baidu(object):
         if errno != 0 :
             logger.debug( errno )
             logger.info("create file failed")
+        endtime = time.time()
+        logger.debug(endtime)
+        usedtime = endtime - starttime
+        speed = json.loads(result)['size'] / usedtime
+        logger.info( "It is used :%ds " % usedtime)
+        logger.info( "speed :%dbyte/s " % speed)
+
         logger.info( "upload file to " + json.loads(result)['path'] )
         return file_md5
 
