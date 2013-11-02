@@ -25,7 +25,7 @@ logging.basicConfig(
                             '%(levelname)s: '
                             '%(lineno)d:\t'
                             '%(message)s',
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 logger = logging.getLogger()
 #logging.config.fileConfig('log_conf.ini')
 #logger = logging.getLogger("simpleExample")
@@ -248,7 +248,7 @@ class Baidu(object):
 
 
         post_data = urllib.urlencode( {
-             'path':destdir + filename,
+             'path':destdir + os.path.basename(filename),
             'isdir':'0',
             'size':os.stat(filename).st_size ,
             'block_list':"[\""+file_md5+"\"]",
@@ -299,7 +299,7 @@ def main():
     baidu = Baidu(user,psw)
     baidu.login()
     baidu.get_bdstoken()
-    upload_md5 = baidu.upload_yunpan(sys.argv[1],sys.argv[2])
+    upload_md5 = baidu.upload_yunpan(sys.argv[1].decode("gbk"),sys.argv[2])
     check_md5 = md5_file(sys.argv[1])
     if upload_md5 == check_md5 :
         print "upload check success"
