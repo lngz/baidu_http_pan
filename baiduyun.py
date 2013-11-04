@@ -309,7 +309,14 @@ def main():
     baidu = Baidu(user,psw)
     baidu.login()
     baidu.get_bdstoken()
-    upload_md5 = baidu.upload_yunpan(sys.argv[1].decode("gbk"),sys.argv[2])
+    import platform
+    sysstr = platform.system()
+    if(sysstr =="Windows"):
+        filename = sys.argv[1].decode("gbk")
+    else:
+        filename = sys.argv[1]
+    
+    upload_md5 = baidu.upload_yunpan(filename,sys.argv[2])
     check_md5 = md5_file(sys.argv[1])
     if upload_md5 == check_md5 :
         print "upload check success"
