@@ -288,32 +288,6 @@ class Baidu(object):
         logger.info( "upload file to " + json.loads(result)['path'] )
         return file_md5
 
-    def list(self, path='/'):
-        list_url = "http://pan.baidu.com/api/list?"
-        param = { 
-            'channel':'chunlei',
-            'clienttype':'0',
-            'web':'1',
-            'num':'100',
-            't':time.time(),
-            'page':'1',
-            'dir': path,
-            't':0.12579,
-            'order':'time',
-            'desc':1,
-            '_':time.time(),
-        }
-        list_url += urllib.urlencode(param)
-        logger.debug(list_url)
-        rsp = urllib2.urlopen(list_url).read()
-
-        logger.debug( rsp )
-        file_list = json.loads(rsp)['list']
-        for f in file_list :
-            print f['fs_id'],f['server_filename'],f['isdir'],  f['size'],f['path']
-            
-        
-
 
     def get_bdstoken(self):
         url = 'http://pan.baidu.com/disk/home'
@@ -334,9 +308,6 @@ def main():
 
     baidu = Baidu(user,psw)
     baidu.login()
-    #baidu.list('/我的分享')
-
-
     baidu.get_bdstoken()
     import platform
     sysstr = platform.system()
