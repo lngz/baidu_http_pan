@@ -202,6 +202,34 @@ class Baidu(object):
         rsp = urllib2.urlopen(req).read()
         print rsp
         
+    def list(self, path='/'):
+        list_url = "http://pan.baidu.com/api/list?"
+        param = { 
+            'channel':'chunlei',
+            'clienttype':'0',
+            'web':'1',
+            'num':'100',
+            't':time.time(),
+            'page':'1',
+            'dir': path,
+            't':0.12579,
+            'order':'time',
+            'desc':1,
+            '_':time.time(),
+        }
+        list_url += urllib.urlencode(param)
+        logger.debug(list_url)
+        rsp = urllib2.urlopen(list_url).read()
+
+        logger.debug( rsp )
+        file_list = json.loads(rsp)['list']
+        for f in file_list :
+            print f['fs_id'],f['server_filename'],f['isdir'],  f['size'],f['path']
+            
+        
+
+
+        
     def upload_yunpan(self,filename,destdir):
         
         for cookie in self.cj:
