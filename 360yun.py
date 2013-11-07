@@ -106,7 +106,7 @@ class yun360(object):
         self.totalpage = 0
 
         self.logined = False
-        self.cj = cookielib.LWPCookieJar()
+        self.cj = cookielib.MozillaCookieJar()
         try:
             self.cj.revert(self.cookiename,ignore_discard=True,ignore_expires=True)
             self.logined = True

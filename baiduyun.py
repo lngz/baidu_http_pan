@@ -106,7 +106,7 @@ class Baidu(object):
         self.totalpage = 0
 
         self.logined = False
-        self.cj = cookielib.LWPCookieJar()
+        self.cj = cookielib.MozillaCookieJar()
         try:
             self.cj.revert(self.cookiename)
             self.logined = True
