@@ -11,6 +11,8 @@ import time
 reload(sys)
 sys.setdefaultencoding('UTF-8')
 
+from stat import S_IFDIR, S_IFLNK, S_IFREG
+
 import os,sys,socket,re
 #!/usr/bin/env python
 import io
@@ -104,6 +106,14 @@ class Baidu(object):
         self.allCount  = 0
         self.pageSize  = 10
         self.totalpage = 0
+        self.filest = {}
+        now = time.time()
+        self.filest['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now,
+                               st_mtime=now, st_atime=now, st_nlink=2)
+        self.filest['.'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now,
+                               st_mtime=now, st_atime=now, st_nlink=2)
+        self.filest['..'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now,
+                               st_mtime=now, st_atime=now, st_nlink=2)
 
         self.logined = False
         self.cj = cookielib.MozillaCookieJar()
@@ -222,11 +232,27 @@ class Baidu(object):
         rsp = urllib2.urlopen(list_url).read()
 
         logger.debug( rsp )
-        file_list = json.loads(rsp)['list']
-        for f in file_list :
-            print f['fs_id'],f['server_filename'],f['isdir'],  f['size'],f['path']
+        self.file_list = json.loads(rsp)['list']
             
-        
+        now = time.time()
+        filelist = []
+
+        for f in self.file_list :
+            if f['isdir'] == 1 :
+                st = dict(st_mode=(S_IFDIR | 0755), st_nlink=2)
+            else:
+                st = dict(st_mode=(S_IFREG | 0755), st_nlink=1)
+            st['st_size'] = int(f['size'])
+            st['st_ctime'] = int(f['local_ctime'])
+            st['st_mtime'] = int(f['local_mtime'])
+            st['st_atime'] = int(f['server_ctime'])
+            st['st_uid'] = 0
+            st['st_gid'] = 0
+            self.filest[f['path']] = st
+            filelist.append(f['server_filename'])
+        #     print f['fs_id'],f['server_filename'],f['isdir'],  f['size'],f['path']
+        print filelist
+        return filelist
 
 
         
@@ -255,15 +281,26 @@ class Baidu(object):
         files = [('Filedata', filename, open(filename, 'rb'))]
 
         # iterate and write chunk in a socket
-        content_type, body = MultipartFormdataEncoder().encode(fields, files)
-        headers = {
-            'Content-Type': content_type,
-            'Content-Length': str(len(body)),
-            }
-        req = urllib2.Request(upload_file_url,body,headers=headers)
-        page = urllib2.urlopen(req)
-        result = page.read()
+        # content_type, body = MultipartFormdataEncoder().encode(fields, files)
+        # headers = {
+        #     'Content-Type': content_type,
+        #     'Content-Length': str(len(body)),
+        #     }
+        # req = urllib2.Request(upload_file_url,body,headers=headers)
+        # page = urllib2.urlopen(req)
+
+        curl_command = ['/usr/bin/curl', '-b', self.cookiename, '-F', "Filedata=@%s" % filename, upload_file_url]
+
+        logger.debug(curl_command)
+
+        from subprocess import Popen, PIPE
+        process = Popen(curl_command, stdout=PIPE)
+        result = process.stdout.read()
+
+        process.wait()              # Wait for it to complete
+
         file_md5= json.loads(result)['md5']
+
         logger.debug("update website result string:%s",result)
         logger.debug("update file md5 sume:%s",file_md5)
 
@@ -337,6 +374,9 @@ def main():
     baidu = Baidu(user,psw)
     baidu.login()
     baidu.get_bdstoken()
+    baidu.list('/01.test')
+    sys.exit(0)
+
     import platform
     sysstr = platform.system()
     if(sysstr =="Windows"):
