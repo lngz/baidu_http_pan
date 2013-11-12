@@ -28,7 +28,7 @@ logging.basicConfig(
                             '%(levelname)s: '
                             '%(lineno)d:\t'
                             '%(message)s',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 logger = logging.getLogger()
 #logging.config.fileConfig('log_conf.ini')
 #logger = logging.getLogger("simpleExample")
@@ -39,54 +39,6 @@ def md5_file(name):
     m.update(a_file.read())
     a_file.close()
     return m.hexdigest()
-
-class MultipartFormdataEncoder(object):
-    def __init__(self):
-        self.boundary = uuid.uuid4().hex
-        self.content_type = 'multipart/form-data; boundary={}'.format(self.boundary)
-
-    @classmethod
-    def u(cls, s):
-        if sys.hexversion < 0x03000000 and isinstance(s, str):
-            s = s.decode('utf-8')
-        if sys.hexversion >= 0x03000000 and isinstance(s, bytes):
-            s = s.decode('utf-8')
-        return s
-
-    def iter(self, fields, files):
-        """
-        fields is a sequence of (name, value) elements for regular form fields.
-        files is a sequence of (name, filename, file-type) elements for data to be uploaded as files
-        Yield body's chunk as bytes
-        """
-        encoder = codecs.getencoder('utf-8')
-        for (key, value) in fields:
-            key = self.u(key)
-            yield encoder('--{}\r\n'.format(self.boundary))
-            yield encoder(self.u('Content-Disposition: form-data; name="{}"\r\n').format(key))
-            yield encoder('\r\n')
-            if isinstance(value, int) or isinstance(value, float):
-                value = str(value)
-            yield encoder(self.u(value))
-            yield encoder('\r\n')
-        for (key, filename, fd) in files:
-            key = self.u(key)
-            filename = self.u(filename)
-            yield encoder('--{}\r\n'.format(self.boundary))
-            yield encoder(self.u('Content-Disposition: form-data; name="{}"; filename="{}"\r\n').format(key, filename))
-            yield encoder('Content-Type: {}\r\n'.format(mimetypes.guess_type(filename)[0] or 'application/octet-stream'))
-            yield encoder('\r\n')
-            with fd:
-                buff = fd.read()
-                yield (buff, len(buff))
-            yield encoder('\r\n')
-        yield encoder('--{}--\r\b'.format(self.boundary))
-
-    def encode(self, fields, files):
-        body = io.BytesIO()
-        for chunk, chunk_len in self.iter(fields, files):
-            body.write(chunk)
-        return self.content_type, body.getvalue()
 
 
 class Baidu(object):
@@ -133,78 +85,75 @@ class Baidu(object):
 
     #登陆百度
     def login(self):
-        #如果没有获取到cookie，就模拟登陆一下
-        if not self.logined:
+        #第一次访问一下，目的是为了先保存一个cookie下来
+        qurl = '''https://passport.baidu.com/v2/api/?getapi&tpl=yun&apiver=v3&tt=1383192406848&class=login&logintype=basicLogin'''
+        r = self.opener.open(qurl)
+        self.cj.save(self.cookiename)
+
+        #第二次访问，目的是为了获取token
+        qurl = '''https://passport.baidu.com/v2/api/?getapi&tpl=yun&apiver=v3&tt=1383192406848&class=login&logintype=basicLogin'''
+        r = self.opener.open(qurl)
+        rsp = r.read()
+        self.cj.save(self.cookiename)
+
+        #通过正则表达式获取token
+        login_tokenStr = '''token" : "(.*?)"'''
+        login_tokenObj = re.compile(login_tokenStr,re.DOTALL)
+        matched_objs = login_tokenObj.findall(rsp)
+        if matched_objs:
+            self.token = matched_objs[0]
+            logger.debug( self.token )
+            #然后用token模拟登陆
+            post_data = urllib.urlencode({
+                                    'username':self.user,
+                                    'password':self.psw,
+                                    'token':self.token,
+                                    'staticpage':'http://yun.baidu.com/chres/static/js/pass_v3_jump.html',
+                                    'charset':'utf-8',
+                                    'tpl':'yun',
+                                    'apiver':'v3',
+                                    'tt':'1383185233025',
+                                    'codestring':'',
+                                    'isPhone':'false',
+                                    'safeflg':'0',
+                                    'u':'http://yun.baidu.com/',
+                                    'quick_user':'0',
+                                    'logintype':'basicLogin',
+                                    'verifycode':'',
+                                    'mem_pass':'on',
+                                    'ppui_logintime':'25955',
+                                    'callback':'parent.bd__pcbs__a8jd5z'
+                                        })
+            #path = 'http://passport.baidu.com/?login'
+            path = 'https://passport.baidu.com/v2/api/?login'
+            self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
+            self.opener.addheaders = []
+            urllib2.install_opener(self.opener)
+            headers = {"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language":"zh-CN,zh;q=0.8",
+                    "Cache-Control":"max-age=0",
+                    "Connection":"keep-alive",
+                    "Content-Length":"394",
+                    "Host":"passport.baidu.com",
+                    "Origin":"http://yun.baidu.com",
+                    "Referer":"http://yun.baidu.com/",
+                    "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.95 Safari/537.36",
+
+            }
+            req = urllib2.Request(path,
+                            post_data,
+                            headers=headers,
+                            )
+            rsp = self.opener.open(req).read()
+            logger.debug( rsp )
+            if not "err_no=0" in rsp:
+                logger.info("Maybe Login failed!!")
             
-            #第一次访问一下，目的是为了先保存一个cookie下来
-            qurl = '''https://passport.baidu.com/v2/api/?getapi&tpl=yun&apiver=v3&tt=1383192406848&class=login&logintype=basicLogin'''
-            r = self.opener.open(qurl)
             self.cj.save(self.cookiename)
-
-            #第二次访问，目的是为了获取token
-            qurl = '''https://passport.baidu.com/v2/api/?getapi&tpl=yun&apiver=v3&tt=1383192406848&class=login&logintype=basicLogin'''
-            r = self.opener.open(qurl)
-            rsp = r.read()
-            self.cj.save(self.cookiename)
-
-            #通过正则表达式获取token
-            login_tokenStr = '''token" : "(.*?)"'''
-            login_tokenObj = re.compile(login_tokenStr,re.DOTALL)
-            matched_objs = login_tokenObj.findall(rsp)
-            if matched_objs:
-                self.token = matched_objs[0]
-                logger.debug( self.token )
-                #然后用token模拟登陆
-                post_data = urllib.urlencode({
-                                        'username':self.user,
-                                        'password':self.psw,
-                                        'token':self.token,
-                                        'staticpage':'http://yun.baidu.com/chres/static/js/pass_v3_jump.html',
-                                        'charset':'utf-8',
-                                        'tpl':'yun',
-                                        'apiver':'v3',
-                                        'tt':'1383185233025',
-                                        'codestring':'',
-                                        'isPhone':'false',
-                                        'safeflg':'0',
-                                        'u':'http://yun.baidu.com/',
-                                        'quick_user':'0',
-                                        'logintype':'basicLogin',
-                                        'verifycode':'',
-                                        'mem_pass':'on',
-                                        'ppui_logintime':'25955',
-                                        'callback':'parent.bd__pcbs__a8jd5z'
-                                            })
-                #path = 'http://passport.baidu.com/?login'
-                path = 'https://passport.baidu.com/v2/api/?login'
-                self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
-                self.opener.addheaders = []
-                urllib2.install_opener(self.opener)
-                headers = {"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                        "Accept-Language":"zh-CN,zh;q=0.8",
-                        "Cache-Control":"max-age=0",
-                        "Connection":"keep-alive",
-                        "Content-Length":"394",
-                        "Host":"passport.baidu.com",
-                        "Origin":"http://yun.baidu.com",
-                        "Referer":"http://yun.baidu.com/",
-                        "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.95 Safari/537.36",
-
-                }
-                req = urllib2.Request(path,
-                                post_data,
-                                headers=headers,
-                                )
-                rsp = self.opener.open(req).read()
-                logger.debug( rsp )
-                if not "err_no=0" in rsp:
-                    logger.info("Maybe Login failed!!")
-                
-                self.cj.save(self.cookiename)
-            else:
-                logger.info( "Can't get token" )
-                logger.debug(rsp)
-                sys.exit(0)
+        else:
+            logger.info( "Can't get token" )
+            logger.debug(rsp)
+            sys.exit(0)
 
     #获取每一页里的博客链接
     def fetchPage(self,url):
@@ -254,10 +203,33 @@ class Baidu(object):
         print filelist
         return filelist
 
+    def get_bdstoken(self):
+        url = 'http://pan.baidu.com/disk/home'
+        req = urllib2.Request(url)
+        rsp = urllib2.urlopen(req).read()
+        login_tokenStr = '''FileUtils.bdstoken="(.*?)"'''
+        login_tokenObj = re.compile(login_tokenStr,re.DOTALL)
+        matched_objs = login_tokenObj.findall(rsp)
 
-        
+        if len(matched_objs) == 0:
+            logger.info("Can't get bdstoken, Maybe login failed.")
+            return False
+        else:
+            self.bdstoken = matched_objs[0]
+            if self.bdstoken == '' :
+                logger.info("Can't get bdstoken, Maybe login failed.")
+                return False
+            else :
+                logger.debug(self.bdstoken)
+                return True
+
+    
     def upload_yunpan(self,filename,destdir):
-        
+        if self.get_bdstoken() :
+            pass
+        else :
+            self.login()
+
         for cookie in self.cj:
             logger.debug("%s -> %s", cookie.name, cookie.value)
             if cookie.name == 'BDUSS':
@@ -289,7 +261,9 @@ class Baidu(object):
         # req = urllib2.Request(upload_file_url,body,headers=headers)
         # page = urllib2.urlopen(req)
 
-        curl_command = ['/usr/bin/curl', '-b', self.cookiename, '-F', "Filedata=@%s" % filename, upload_file_url]
+        curl_command = [ 'curl', '-b', self.cookiename, 
+                    '-F', "Filedata=@%s" % filename, 
+                    upload_file_url ]
 
         logger.debug(curl_command)
 
@@ -354,17 +328,6 @@ class Baidu(object):
         return file_md5
 
 
-    def get_bdstoken(self):
-        url = 'http://pan.baidu.com/disk/home'
-        req = urllib2.Request(url)
-        rsp = urllib2.urlopen(req).read()
-        login_tokenStr = '''FileUtils.bdstoken="(.*?)"'''
-        login_tokenObj = re.compile(login_tokenStr,re.DOTALL)
-        matched_objs = login_tokenObj.findall(rsp)
-        self.bdstoken = matched_objs[0]
-        logger.debug(self.bdstoken)
-        if self.bdstoken == '':
-            logger.info("Can't get bdstoken, Maybe login failed.")
  
 def main():
     import password
@@ -373,9 +336,9 @@ def main():
 
     baidu = Baidu(user,psw)
     baidu.login()
-    baidu.get_bdstoken()
-    baidu.list('/01.test')
-    sys.exit(0)
+    # baidu.get_bdstoken()
+    # baidu.list('/01.test')
+    # sys.exit(0)
 
     import platform
     sysstr = platform.system()

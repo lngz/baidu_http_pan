@@ -164,12 +164,12 @@ class yun360(object):
                     'isKeepAlive': 0,
                     'm'  : 'login',
                     'o'  : 'sso',
-                    'password'  :  '15be6c30a18e2e9baf739f457193fdaf',
+                    'password'  :  hashlib.md5(self.psw).hexdigest(),
                     'pwdmethod' :  1,
                     'r' :  time.time(),
                     'rtype' :  'data',
                     'token'  : self.token,
-                    'userName' :   'arccreator@sina.com',
+                    'userName' :   self.user,
                     })
                 r = self.opener.open(login_url)
                 rsp = r.read()
