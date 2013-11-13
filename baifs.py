@@ -34,6 +34,9 @@ class baidufs(LoggingMixIn, Operations):
     #     f.chmod(mode)
     #     f.close()
     #     return 0
+    def create(self, path, mode):
+        print path
+        return True
 
     # def destroy(self, path):
     #     self.sftp.close()
@@ -95,4 +98,4 @@ if __name__ == '__main__':
         print('usage: %s  <mountpoint>' % argv[0])
         exit(1)
 
-    fuse = FUSE(baidufs(), argv[1], foreground=False, nothreads=True)
+    fuse = FUSE(baidufs(), argv[1], foreground=True, nothreads=True)
