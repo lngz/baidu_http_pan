@@ -221,6 +221,7 @@ class Baidu(object):
             sys.exit(1)
         starttime = time.time()
         logger.debug(starttime)
+        
         upload_file_url = 'http://c.pcs.baidu.com/rest/2.0/pcs/file?' + urllib.urlencode({'BDUSS':self.BDUSS,
                     'method':'upload', 'type':'tmpfile', 'app_id':'250528', })
         logger.debug(upload_file_url)
@@ -261,7 +262,7 @@ class Baidu(object):
 
 
         post_data = urllib.urlencode( {
-             'path':destdir + os.path.basename(filename),
+             'path':destdir + '/' + os.path.basename(filename),
             'isdir':'0',
             'size':os.stat(filename).st_size ,
             'block_list':"[\""+file_md5+"\"]",
@@ -295,7 +296,32 @@ class Baidu(object):
         logger.info( "upload file to " + json.loads(result)['path'] )
         return file_md5
 
-
+    def delete(self,filelist):
+        
+        delete_file_url = 'http://pan.baidu.com/api/filemanager?' + urllib.urlencode(
+                        { 'channel':'chunlei',
+                            'clienttype':'0',
+                            'web':'1',
+                            'opera':'delete',
+                            'bdstoken':self.bdstoken,
+                        })
+        headers = {
+            'Accept':'*/*', 'Accept-Encoding':'gzip,deflate,sdch',
+            'Accept-Language':'zh-CN,zh;q=0.8', 'Connection':'keep-alive',
+            'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
+            'Host':'pan.baidu.com', 'Origin':'http://pan.baidu.com',
+            'Referer':'http://pan.baidu.com/disk/home',
+            'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.95 Safari/537.36',
+            'X-Requested-With':'XMLHttpRequest', }
+        logger.debug(delete_file_url)
+        logger.debug(filelist)
+        post_data = urllib.urlencode( {
+             'filelist': '["'+filelist+'"]'
+            })
+        logger.debug(post_data)
+        req = urllib2.Request(delete_file_url,post_data,headers=headers)
+        result = urllib2.urlopen(req).read()
+        logger.info(result)
 
 def main():
     import password
@@ -304,9 +330,12 @@ def main():
 
     baidu = Baidu(user,psw)
     baidu.login()
-    # baidu.get_bdstoken()
+
+    baidu.get_bdstoken()
+
+    #baidu.delete(sys.argv[1])
     # baidu.list('/01.test')
-    # sys.exit(0)
+    #sys.exit(0)
 
     import platform
     sysstr = platform.system()
