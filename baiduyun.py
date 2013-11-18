@@ -210,9 +210,6 @@ class Baidu(object):
     
     def upload_yunpan(self,filename,destdir):
         if self.bdstoken == '' :
-            self.get_bdstoken()
-        else :
-            logger.info("login failed,please relogin")
             sys.exit(1)
 
 

@@ -2,6 +2,7 @@
 from baiduyun import Baidu
 from sys import argv, exit
 from time import time
+from stat import S_IFDIR, S_IFLNK, S_IFREG
 
 
 from fuse import FUSE, Operations, LoggingMixIn
@@ -18,7 +19,7 @@ class baidufs(LoggingMixIn, Operations):
         import password
         user = password.user
         psw  = password.psw
-
+        self.cache = '/tmp/' 
         self.baidu = Baidu(user,psw)
         self.baidu.login()
         self.baidu.get_bdstoken()
@@ -34,9 +35,14 @@ class baidufs(LoggingMixIn, Operations):
     #     f.chmod(mode)
     #     f.close()
     #     return 0
+
     def create(self, path, mode):
         print path
-        return True
+        f = os.open(self.cache + path, os.O_WRONLY | os.O_CREAT, mode)
+        f.chmod(mode)
+        f.close()
+
+        return 0
 
     # def destroy(self, path):
     #     self.sftp.close()
@@ -44,10 +50,8 @@ class baidufs(LoggingMixIn, Operations):
 
     def getattr(self, path, fh=None):
         if path not in self.baidu.filest:
-            now = time.time()
-            return dict(st_mode=(S_IFDIR | 0755), st_ctime=now,
-                               st_mtime=now, st_atime=now, st_nlink=2)
-        print path,'-------'
+            
+            return dict(st_mode=(S_IFDIR | 0755),st_nlink=2)
         st = self.baidu.filest[path]
         return st
 
@@ -92,6 +96,10 @@ class baidufs(LoggingMixIn, Operations):
     #     f.close()
     #     return len(data)
 
+    def write(self, path, data, offset, fh):
+        with self.rwlock:
+            os.lseek(fh, offset, 0)
+            return os.write(fh, data)
 
 if __name__ == '__main__':
     if len(argv) != 2:
