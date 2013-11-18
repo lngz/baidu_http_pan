@@ -36,14 +36,6 @@ class baidufs(LoggingMixIn, Operations):
     #     f.close()
     #     return 0
 
-    def create(self, path, mode):
-        print path
-        f = os.open(self.cache + path, os.O_WRONLY | os.O_CREAT, mode)
-        f.chmod(mode)
-        f.close()
-
-        return 0
-
     # def destroy(self, path):
     #     self.sftp.close()
     #     self.client.close()
@@ -96,10 +88,6 @@ class baidufs(LoggingMixIn, Operations):
     #     f.close()
     #     return len(data)
 
-    def write(self, path, data, offset, fh):
-        with self.rwlock:
-            os.lseek(fh, offset, 0)
-            return os.write(fh, data)
 
 if __name__ == '__main__':
     if len(argv) != 2:

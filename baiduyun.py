@@ -154,6 +154,11 @@ class Baidu(object):
         rsp = urllib2.urlopen(req).read()
         print rsp
         
+
+    #
+    # 功能：列出path目录下的所有文件。
+    # 返回值：返回所有文件的数组。
+    #
     def list(self, path='/'):
         list_url = "http://pan.baidu.com/api/list?" + urllib.urlencode({'channel':'chunlei', 'clienttype':'0',
             'web':'1', 'num':'100', 't':time.time(),
@@ -179,14 +184,19 @@ class Baidu(object):
             st['st_ctime'] = int(f['local_ctime'])
             st['st_mtime'] = int(f['local_mtime'])
             st['st_atime'] = int(f['server_ctime'])
-            st['st_uid'] = 0
-            st['st_gid'] = 0
+            st['st_uid'] = os.getuid()
+            st['st_gid'] = os.getgid()
             self.filest[f['path']] = st
             filelist.append(f['server_filename'])
         #     print f['fs_id'],f['server_filename'],f['isdir'],  f['size'],f['path']
-        print filelist
+        logger.debug( filelist )
         return filelist
 
+    #
+    # 功能：得到当前回话的bdstoken
+    # 返回值：得到bdstoken  True
+    #        不能得到bdstoken False
+    #
     def get_bdstoken(self):
         url = 'http://pan.baidu.com/disk/home'
         req = urllib2.Request(url)
@@ -207,7 +217,10 @@ class Baidu(object):
                 logger.debug(self.bdstoken)
                 return True
 
-    
+    #
+    # 功能：上传文件到指定目录
+    #
+    #
     def upload_yunpan(self,filename,destdir):
         if self.bdstoken == '' :
             sys.exit(1)
@@ -216,9 +229,14 @@ class Baidu(object):
         if self.BDUSS == '' :
             logger.info("login failed,please relogin")
             sys.exit(1)
+        #记录开始时间
         starttime = time.time()
         logger.debug(starttime)
         
+        # 上传文件，使用post方法，
+        #   参数 1 cookie中的BDUSS，
+        #  post文件需要encode变换，所以采用curl命令方式，防止python处理文件超大出现异常，
+        #
         upload_file_url = 'http://c.pcs.baidu.com/rest/2.0/pcs/file?' + urllib.urlencode({'BDUSS':self.BDUSS,
                     'method':'upload', 'type':'tmpfile', 'app_id':'250528', })
         logger.debug(upload_file_url)
@@ -237,26 +255,31 @@ class Baidu(object):
 
         curl_command = [ 'curl', '-b', self.cookiename, '-F', "Filedata=@%s" % filename,
                     upload_file_url ]
-
         logger.debug(curl_command)
-
+        
+        #处理curl命令
         from subprocess import Popen, PIPE
         process = Popen(curl_command, stdout=PIPE)
         result = process.stdout.read()
-
         process.wait()              # Wait for it to complete
 
+        #抽取返回字符串，字符串含百度云检测文件的md5值，和requestid
         file_md5= json.loads(result)['md5']
 
         logger.debug("update website result string:%s",result)
         logger.debug("update file md5 sume:%s",file_md5)
 
+        #
+        # 将刚刚上传的文件创建到自己的云目录。
+        # 参数 1 bdstoken
+        #     2 要保存的文件的目录
+        #     3 文件的大小
+        #     4 文件的md5值
         create_file_url = 'http://pan.baidu.com/api/create?' + urllib.urlencode({ 'a':'commit',
                             'channel':'chunlei', 'clienttype':'0', 'web':'1',
                             'bdstoken':self.bdstoken,
                         })
         logger.debug("create file file url:%s",create_file_url)
-
 
         post_data = urllib.urlencode( {
              'path':destdir + '/' + os.path.basename(filename),
@@ -276,6 +299,9 @@ class Baidu(object):
             'X-Requested-With':'XMLHttpRequest', }
         req = urllib2.Request(create_file_url,post_data,headers=headers)
 
+        #
+        #处理创建操作的结果。errno值为0为创建成功，并返回文件id，服务器文件名，大小等信息。
+        #
         result = urllib2.urlopen(req).read()
         logger.debug( result )
         errno = json.loads(result)["errno"]
@@ -283,18 +309,23 @@ class Baidu(object):
             logger.debug( errno )
             logger.info("create file failed")
 
+        #计算结束时间，和上传速度
         endtime = time.time()
         logger.debug(endtime)
         usedtime = endtime - starttime
         speed = json.loads(result)['size'] / usedtime
+
         logger.info( "It is used :%ds " % usedtime)
         logger.info( "speed :%dbyte/s " % speed)
-
         logger.info( "upload file to " + json.loads(result)['path'] )
+
+        #返回上传文件md5值
         return file_md5
 
+    #
+    # 功能：删除服务器上的文件
+    #
     def delete(self,filelist):
-        
         delete_file_url = 'http://pan.baidu.com/api/filemanager?' + urllib.urlencode(
                         { 'channel':'chunlei',
                             'clienttype':'0',
@@ -312,25 +343,28 @@ class Baidu(object):
             'X-Requested-With':'XMLHttpRequest', }
         logger.debug(delete_file_url)
         logger.debug(filelist)
-        post_data = urllib.urlencode( {
-             'filelist': '["'+filelist+'"]'
-            })
+        post_data = urllib.urlencode( {'filelist': '["'+','.join(filelist)+'"]'})
         logger.debug(post_data)
         req = urllib2.Request(delete_file_url,post_data,headers=headers)
         result = urllib2.urlopen(req).read()
         logger.info(result)
+        return
 
 def main():
     import password
     user = password.user
     psw  = password.psw
 
+    #登陆百度云
     baidu = Baidu(user,psw)
     baidu.login()
 
+    #得到当前会话token
     baidu.get_bdstoken()
 
+    # 删除文件
     #baidu.delete(sys.argv[1])
+    # 列出目录文件
     # baidu.list('/01.test')
     #sys.exit(0)
 
@@ -341,7 +375,10 @@ def main():
     else:
         filename = sys.argv[1]
     
+    #上传文件
     upload_md5 = baidu.upload_yunpan(filename,sys.argv[2])
+    
+    #检查上传文件是否失败，比较md5值
     check_md5 = md5_file(sys.argv[1])
     if upload_md5 == check_md5 :
         print "upload check success"
