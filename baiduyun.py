@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-
+#
+# Copyright 
+#  Author : liangzi 
+#
 import cookielib, urllib2
 import urllib
 import json
